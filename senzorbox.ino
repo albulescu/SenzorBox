@@ -8,7 +8,7 @@
 #endif
 
 // Send data to master interval
-int SEND_INTERVAL    = 5000;
+int SEND_INTERVAL    = 1000 * 60;
 
 // set isMoving flag to false after this interval
 int MOVING_STOP_TIMEOUT  = 5000;
