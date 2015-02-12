@@ -7,6 +7,11 @@
 #include "WProgram.h"
 #endif
 
+// Send data to master interval
+int SEND_INTERVAL    = 5000;
+
+// set isMoving flag to false after this interval
+int MOVING_STOP_TIMEOUT  = 5000;
 
 // Senzors zone
 int ZONE             = 4;
@@ -22,14 +27,17 @@ int PULSE_LENGTH     = 100;
 
 Timer timer;
 
-
+// Keep last sent data
+// to check if send is 
+// required
 boolean sent_moving;
 int sent_temperature;
 int sent_luminosity;
 int sent_humidity;
 int sent_time;
 
-
+// PIR senzor is on
+boolean isMoving;
 
 int read_temperature() {
   int value = analogRead( TEMPERATURE_PIN );
@@ -122,7 +130,6 @@ void sendData() {
       humidity == sent_humidity && 
       moving == sent_moving &&
       luminosity == sent_luminosity ) {
-      Serial.println("Data is the same. Skip sending!");
       return;
   }
   
@@ -138,7 +145,8 @@ void sendData() {
   sendBytes( dec2bin(humidity, 8) );
   sendBytes( dec2bin(luminosity, 8) );
   sendSync();
-   
+  
+  // Blink arduino led
   digitalWrite(13, HIGH);
   delay(50);
   digitalWrite(13, LOW);
@@ -149,21 +157,32 @@ void sendData() {
   Serial.println("Sent");
 }
 
+void stopMoving() {
+   isMoving = false; 
+}
+
 void setup() {
   
-  timer.every(2000, sendData);  
+  timer.every(SEND_INTERVAL, sendData);  
   
   pinMode(EMIT_PIN, OUTPUT);
   pinMode(13, OUTPUT);
   
-  Serial.begin(9600);  
-  
+  Serial.begin(9600);   
 }
 
 void loop() {
   
-  if(read_moving()) {
-    sendData();  
+  boolean moving = read_moving();
+  
+  if( moving  && moving != isMoving ) {
+    // if moving detected 
+    // send data immediately
+    sendData();
+    
+    isMoving = moving;
+    
+    timer.after(MOVING_STOP_TIMEOUT, stopMoving);
   }
   
   timer.update();
