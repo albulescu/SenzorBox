@@ -139,7 +139,6 @@ void sendData() {
   sent_moving = moving;
   
   sendBytes( dec2bin(ZONE, 4) );
-  sendBytes( dec2bin(ZONE, 4) );
   sendBytes( dec2bin(moving ? 1:0, 1) );
   sendBytes( dec2bin(temperature, 8) );
   sendBytes( dec2bin(humidity, 8) );
