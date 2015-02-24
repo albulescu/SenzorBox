@@ -1,3 +1,7 @@
+#include <OneWire.h>
+
+#include <DallasTemperature.h>
+
 #include <Timer.h>
 #include <Event.h>
 
@@ -7,25 +11,33 @@
 #include "WProgram.h"
 #endif
 
+int FREQUENCY = 20;
+
 // Send data to master interval
 int SEND_INTERVAL    = 1000 * 60;
 
 // set isMoving flag to false after this interval
-int MOVING_STOP_TIMEOUT  = 5000;
+int MOVING_STOP_TIMEOUT  = 2000;
 
 // Senzors zone
 int ZONE             = 4;
 
 // Senzors pins
-int PIR_PIN         = A0;
+int EMIT_PIN        = 0;
+int TEMPERATURE_PIN = 1;
 int LIGHT_PIN       = A1;
-int TEMPERATURE_PIN = A2;
+int HUMIDITY_PIN    = A3;
+int PIR_PIN         = A2;
 
-int EMIT_PIN         = 10;
 
 int PULSE_LENGTH     = 100;
 
 Timer timer;
+
+OneWire oneWire(TEMPERATURE_PIN);
+ 
+// Pass our oneWire reference to Dallas Temperature.
+DallasTemperature sensors(&oneWire);
 
 // Keep last sent data
 // to check if send is 
@@ -39,14 +51,19 @@ int sent_time;
 // PIR senzor is on
 boolean isMoving;
 
+int delayVal( int value ) {
+   return value / FREQUENCY;
+}
+
 int read_temperature() {
-  int value = analogRead( TEMPERATURE_PIN );
   
-  if( value < 30 ) {
-    value = 0;  
-  }
+  sensors.requestTemperatures();
   
-  return value;
+  int temperature = sensors.getTempCByIndex(0);
+  
+  
+  
+  return temperature;
 }  
 
 int read_humidity() {
@@ -54,7 +71,7 @@ int read_humidity() {
 }
 
 int read_luminosity() {
-  return 90;
+  return analogRead(LIGHT_PIN);
 }
 
 boolean read_moving() {
@@ -86,9 +103,9 @@ char* dec2bin(unsigned long Dec, unsigned int bitLength){
 
 void sendBit(int high, int low) {
   digitalWrite(EMIT_PIN, HIGH);
-  delayMicroseconds(PULSE_LENGTH * high);
+  delayMicroseconds(delayVal(PULSE_LENGTH * high));
   digitalWrite(EMIT_PIN, LOW);
-  delayMicroseconds(PULSE_LENGTH * low);
+  delayMicroseconds(delayVal(PULSE_LENGTH * low));
 }
 
 void sendZero() {
@@ -119,9 +136,19 @@ void sendBytes( char * sCodeWord ) {
   }
 }
 
+void blinkLed() {
+  
+  // Blink arduino led
+  digitalWrite(0, HIGH);
+  delay(delayVal(50));
+  digitalWrite(0, LOW);
+  delay(delayVal(50));
+  
+}
+
 void sendData() {
   
-  boolean moving      = read_moving();
+  boolean moving  = read_moving();
   int temperature = read_temperature();
   int humidity    = read_humidity();
   int luminosity  = read_luminosity();
@@ -130,7 +157,7 @@ void sendData() {
       humidity == sent_humidity && 
       moving == sent_moving &&
       luminosity == sent_luminosity ) {
-      return;
+      //return;
   }
   
   sent_temperature = temperature;
@@ -146,46 +173,45 @@ void sendData() {
   sendBytes( dec2bin(luminosity, 8) );
   sendSync();
   
-  // Blink arduino led
-  digitalWrite(13, HIGH);
-  delay(50);
-  digitalWrite(13, LOW);
-  delay(50);
+  blinkLed();
   
   sent_time = millis();
-  
-  Serial.println("Sent");
-}
 
-void stopMoving() {
-   isMoving = false; 
 }
 
 void setup() {
   
-  timer.every(SEND_INTERVAL, sendData);  
+  timer.every(delayVal(SEND_INTERVAL), sendData);  
   
   pinMode(EMIT_PIN, OUTPUT);
-  pinMode(13, OUTPUT);
+  pinMode(TEMPERATURE_PIN, INPUT); 
+  pinMode(LIGHT_PIN, INPUT);
+  pinMode(HUMIDITY_PIN, INPUT);
+  pinMode(PIR_PIN, INPUT);
   
-  Serial.begin(9600);   
+  sensors.begin();
+}
+
+void stopMoving() {
+   isMoving = false; 
+   blinkLed();
 }
 
 void loop() {
-  
+
   boolean moving = read_moving();
-  
-  if( moving  && moving != isMoving ) {
+    
+  if( moving && moving != isMoving ) {
     // if moving detected 
     // send data immediately
     sendData();
     
     isMoving = moving;
     
-    timer.after(MOVING_STOP_TIMEOUT, stopMoving);
+    timer.after(delayVal(MOVING_STOP_TIMEOUT), stopMoving);
   }
   
   timer.update();
   
-  delay(500);
+  delay(delayVal(100));
 }
